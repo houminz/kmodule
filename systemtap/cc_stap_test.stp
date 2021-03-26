@@ -1,0 +1,8 @@
+probe process("./a.out").statement("main@./cc_stap_test.c:8")
+{
+    printf("systemtap probe line 8 a:%d\n", $a);
+}
+probe process("./a.out").statement("main@./cc_stap_test.c:10")
+{
+    printf("systemtap probe line 10 a:%d\n", $a);
+}
