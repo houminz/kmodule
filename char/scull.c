@@ -10,7 +10,7 @@
 struct scull_dev {
     int size;
     void *data;
-    struct cdev *cdev;
+    struct cdev cdev;
 };
 
 #define SCULL_SIZE 1024
@@ -31,7 +31,7 @@ static inline void clean_up_scull_data(struct scull_dev *sdev)
 
 static int scull_open(struct inode *inode, struct file *fp)
 {
-    struct scull_dev *sdev = container_of(&inode->i_cdev, struct scull_dev, cdev);
+    struct scull_dev *sdev = container_of(inode->i_cdev, struct scull_dev, cdev);
 
     if ((fp->f_flags &O_ACCMODE) == O_WRONLY) {
         clean_up_scull_data(sdev);
@@ -156,18 +156,13 @@ static int scull_init(void)
     memset(scull_device, 0, sizeof(struct scull_dev));
     scull_device->size = SCULL_SIZE;
 
-    // 3. dynamic init cdev object
-    scull_device->cdev = cdev_alloc();
-    if (scull_device->cdev == NULL) {
-        printk(KERN_ALERT "no memory while alloc cdev!\n");
-        result = -ENOMEM;
-        goto ERR_ALLOC_CDEV;
-    }
-    scull_device->cdev->owner = THIS_MODULE;
-    scull_device->cdev->ops = &fops;
+    // 3. init cdev object
+    cdev_init(&scull_device->cdev, &fops);
+    scull_device->cdev.owner = THIS_MODULE;
+    scull_device->cdev.ops = &fops;
 
     // 4. register cdev object
-    if (cdev_add(scull_device->cdev, dev_num, count)) {
+    if (cdev_add(&scull_device->cdev, dev_num, count)) {
         printk(KERN_ALERT "ERROR: cdev_add %d\n", count);
         goto ERR_REGISTER_CDEV;
     }
@@ -200,9 +195,8 @@ ERR_CREATE_DEVICE:
 
 ERR_CREATE_CLASS:
 ERR_REGISTER_CDEV:
-    cdev_del(scull_device->cdev);
+    cdev_del(&scull_device->cdev);
 
-ERR_ALLOC_CDEV:
     kfree(scull_device);
     scull_device = NULL;
 ERR_KMALLOC:
@@ -224,7 +218,7 @@ static void scull_exit(void)
     }
     class_destroy(cls);
 
-    cdev_del(scull_device->cdev);
+    cdev_del(&scull_device->cdev);
     clean_up_scull_data(scull_device);
     kfree(scull_device);
     scull_device = NULL;
